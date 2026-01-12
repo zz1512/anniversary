@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Our Love Journey - Since 2017</title>
+    <link href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400&family=Playfair+Display:ital,wght@1,400;1,700&display=swap" rel="stylesheet">
+    
+    <style>
+        /* --- 1. 宇宙深空 --- */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: radial-gradient(circle at center, #0b0d17 0%, #161a30 40%, #000000 100%);
+            overflow: hidden;
+            display: flex;
+            perspective: 1400px; 
+            transform-style: preserve-3d;
+            height: 100vh;
+            font-family: 'Lato', sans-serif;
+            color: #fff;
+            user-select: none;
+            -webkit-touch-callout: none;
+        }
+
+        /* --- 2. 3D 舞台 --- */
+        #drag-container, #spin-container {
+            position: relative;
+            display: flex;
+            margin: auto;
+            transform-style: preserve-3d;
+            transform: rotateX(-5deg);
+        }
+
+        /* 
+           【修改点 1】增大图片容器尺寸
+           原 90px -> 现 115px (更清晰)
+        */
+        #spin-container {
+            width: 115px; 
+            height: 165px; 
+        }
+
+        /* --- 3. 照片样式 --- */
+        #spin-container img {
+            transform-style: preserve-3d;
+            position: absolute;
+            left: 0; top: 0;
+            width: 100%; height: 100%;
+            
+            /* 样式微调：更精致的白边 */
+            border: 3px solid rgba(255,255,255,0.9);
+            border-bottom: 12px solid rgba(255,255,255,0.9); 
+            border-radius: 6px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5); 
+            
+            /* 倒影 */
+            -webkit-box-reflect: below 5px linear-gradient(transparent 60%, rgba(255,255,255,0.1));
+            
+            object-fit: cover;
+            cursor: pointer;
+            
+            transition: transform 1s, border-color 0.5s, box-shadow 0.5s, filter 0.5s, opacity 1s;
+            opacity: 0; 
+        }
+
+        #spin-container img.loaded { opacity: 1; }
+
+        /* 聚焦模式 */
+        #spin-container img.selected {
+            border-color: #f3e5ab; 
+            box-shadow: 0 0 50px rgba(243, 229, 171, 0.7); 
+            filter: brightness(1.2);
+            z-index: 999;
+        }
+
+        .blur-mode #spin-container img:not(.selected) {
+            filter: brightness(0.4) blur(3px) grayscale(60%);
+            opacity: 0.5;
+        }
+
+        /* --- 4. 场景元素 --- */
+        #spin-container p {
+            font-family: 'Playfair Display', serif;
+            position: absolute;
+            top: 100%; left: 50%;
+            transform: translate(-50%, -50%) rotateX(90deg);
+            color: rgba(243, 229, 171, 0.5);
+            font-size: 3rem; /* 字体改回大一点 */
+            font-style: italic;
+            white-space: nowrap;
+            pointer-events: none;
+            text-shadow: 0 0 20px rgba(243, 229, 171, 0.2);
+        }
+
+        #ground {
+            width: 1600px; height: 1600px;
+            position: absolute; top: 100%; left: 50%;
+            transform: translate(-50%, -50%) rotateX(90deg);
+            background: radial-gradient(center center, farthest-side, rgba(243, 229, 171, 0.05), transparent);
+        }
+
+        /* --- 5. UI --- */
+        #ui-layer {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 100;
+            display: flex; flex-direction: column; justify-content: space-between;
+            padding: 40px 20px;
+        }
+
+        .timer-box {
+            align-self: center;
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            padding: 8px 25px;
+            border-radius: 50px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+        }
+        .timer-count {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.2rem;
+            color: #f3e5ab;
+        }
+
+        #start-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; z-index: 9999;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            transition: opacity 1s, visibility 1s;
+        }
+        #start-btn {
+            margin-top: 40px; padding: 12px 50px;
+            border: 1px solid #f3e5ab; color: #f3e5ab;
+            background: transparent; font-size: 1.1rem;
+            cursor: pointer; letter-spacing: 3px; border-radius: 50px;
+            transition: 0.3s;
+        }
+        #start-btn:hover { background: #f3e5ab; color: #000; box-shadow: 0 0 30px #f3e5ab; }
+
+        #music-btn {
+            position: fixed; top: 30px; right: 20px; z-index: 1000;
+            width: 40px; height: 40px;
+            border: 1px solid rgba(255,255,255,0.2); border-radius: 50%;
+            display: flex; justify-content: center; align-items: center;
+            opacity: 0; transition: opacity 1s; pointer-events: auto;
+            background: rgba(0,0,0,0.4); backdrop-filter: blur(5px);
+            cursor: pointer;
+        }
+        #music-btn.playing { animation: rotateDisc 4s infinite linear; border-color: #f3e5ab; color: #f3e5ab; }
+        @keyframes rotateDisc { 100% { transform: rotate(360deg); } }
+
+        #canvas-bg { position: fixed; top: 0; left: 0; z-index: -2; }
+        #canvas-fireworks { position: fixed; top: 0; left: 0; z-index: -1; pointer-events: none; }
+    </style>
+</head>
+<body>
+
+    <!-- 启动层 -->
+    <div id="start-screen">
+        <h1 style="font-family: 'Playfair Display'; font-size: 2.5rem; color: #f3e5ab;">Since 2017</h1>
+        <p style="color: rgba(255,255,255,0.5); font-size: 0.8rem; margin-top: 10px;">Our 23 Moments</p>
+        <button id="start-btn" onclick="startApp()">Start Celebration</button>
+    </div>
+
+    <!-- UI -->
+    <div id="ui-layer">
+        <div class="timer-box">
+            <div class="timer-count" id="timer">Loading...</div>
+        </div>
+        <div style="text-align: center; color: rgba(255,255,255,0.2); font-size: 12px;">
+            Tap Photo to Focus & Spark
+        </div>
+    </div>
+
+    <div id="music-btn" onclick="toggleMusic()">🎵</div>
+    <!-- 请确保文件名 loveyou.mp3 正确 -->
+    <audio id="bgm" src="loveyou.mp3" loop preload="auto"></audio>
+
+    <div id="drag-container">
+        <div id="spin-container">
+            <p>2017 - Forever</p>
+        </div>
+        <div id="ground"></div>
+    </div>
+
+    <canvas id="canvas-bg"></canvas>       
+    <canvas id="canvas-fireworks"></canvas>
+
+<script>
+    // ================= 配置 =================
+    const startDate = new Date(2017, 0, 13);
+    
+    const config = {
+        totalImages: 23,        
+        imgExtension: '.jpg',   
+        autoRotateSpeed: 0.15,  
+        friction: 0.95          
+    };
+
+    // ================= 逻辑 =================
+    const spinContainer = document.getElementById('spin-container');
+    const dragContainer = document.getElementById('drag-container');
+    const musicBtn = document.getElementById('music-btn');
+    let images = [];
+    
+    let tX = 0, tY = 5; 
+    let desX = 0, desY = 0; 
+    let isDragging = false;
+    let autoPlay = true; 
+    let selectedIndex = -1; 
+
+    // --- Start按钮逻辑 (含音乐从20s开始) ---
+    function startApp() {
+        const startScreen = document.getElementById('start-screen');
+        startScreen.style.opacity = 0;
+        setTimeout(() => { startScreen.style.visibility = 'hidden'; }, 1000);
+        
+        musicBtn.style.opacity = 1;
+
+        const bgm = document.getElementById('bgm');
+        bgm.volume = 0.5;
+
+        // 【修改点 2】设置音乐从 20秒 开始
+        bgm.currentTime = 20;
+
+        const playPromise = bgm.play();
+        if (playPromise !== undefined) {
+            playPromise.then(_ => {
+                console.log("Music started at 20s");
+                musicBtn.classList.add('playing');
+            })
+            .catch(error => {
+                console.error("Music play failed:", error);
+                alert("请检查 loveyou.mp3 是否正确放置，或点击右上角手动播放");
+            });
+        }
+
+        initGallery();
+        initTimer();
+        initStarAndMeteor(); 
+        initFireworks();     
+        renderLoop();
+    }
+
+    function initGallery() {
+        // 【修改点 3】重新调整半径，因为图片变大了 (115px)
+        // 手机端加大到 380px，PC端加大到 580px
+        let radius;
+        if(window.innerWidth < 768) { 
+            radius = 380; 
+        } else { 
+            radius = 580; 
+        }
+
+        for (let i = 0; i < config.totalImages; i++) {
+            let img = document.createElement('img');
+            img.src = `${i + 1}${config.imgExtension}`; 
+            img.onerror = function() { 
+                this.src = `https://picsum.photos/id/${i + 50}/200/300`; 
+            };
+            img.dataset.idx = i;
+            
+            img.onclick = function(e) {
+                e.stopPropagation();
+                focusOnImage(i, this);
+            };
+
+            spinContainer.appendChild(img);
+            images.push(img);
+        }
+
+        setTimeout(() => {
+            for (let i = 0; i < images.length; i++) {
+                const angle = i * (360 / config.totalImages);
+                images[i].style.transform = `rotateY(${angle}deg) translateZ(${radius}px)`;
+                setTimeout(() => { images[i].classList.add('loaded'); }, (config.totalImages - i) * 30);
+            }
+        }, 200);
+    }
+
+    function focusOnImage(index, imgEl) {
+        if (selectedIndex === index) {
+            cancelFocus();
+            return;
+        }
+
+        selectedIndex = index;
+        autoPlay = false; 
+        desX = 0; desY = 0; 
+        
+        dragContainer.classList.add('blur-mode'); 
+        images.forEach(img => img.classList.remove('selected'));
+        imgEl.classList.add('selected');
+
+        const anglePerImg = 360 / config.totalImages;
+        const targetRotation = -(index * anglePerImg);
+        let currentMod = tX % 360;
+        let targetMod = targetRotation % 360;
+        let diff = targetMod - currentMod;
+        if (diff > 180) diff -= 360;
+        if (diff < -180) diff += 360;
+        tX = tX + diff; 
+        tY = 0; 
+
+        launchManualFirework(); 
+    }
+
+    function cancelFocus() {
+        selectedIndex = -1;
+        autoPlay = true;
+        dragContainer.classList.remove('blur-mode');
+        images.forEach(img => img.classList.remove('selected'));
+        tY = 5; 
+    }
+
+    document.addEventListener('pointerdown', (e) => {
+        if (e.target.tagName !== 'IMG') { cancelFocus(); }
+    });
+
+    function renderLoop() {
+        if (autoPlay && !isDragging) {
+            desX *= config.friction;
+            desY *= config.friction;
+            if (Math.abs(desX) < 0.02) desX = config.autoRotateSpeed;
+            tX += desX;
+            tY += desY;
+        } 
+        if (tY > 15) tY = 15;
+        if (tY < -15) tY = -15;
+
+        spinContainer.style.transform = `rotateX(${-tY}deg) rotateY(${tX}deg)`;
+        requestAnimationFrame(renderLoop);
+    }
+
+    let sX, sY, nX, nY;
+    document.addEventListener('pointerdown', (e) => {
+        if(e.target.tagName === 'IMG') return; 
+        isDragging = true; sX = e.clientX; sY = e.clientY; desX = 0; desY = 0;
+    });
+    document.addEventListener('pointermove', (e) => {
+        if (!isDragging) return;
+        e.preventDefault();
+        nX = e.clientX; nY = e.clientY;
+        desX = (nX - sX) * 0.15; desY = (nY - sY) * 0.15;
+        tX += desX; tY += desY;
+        sX = nX; sY = nY;
+    });
+    document.addEventListener('pointerup', () => { isDragging = false; });
+
+    function toggleMusic() {
+        const bgm = document.getElementById('bgm');
+        if (bgm.paused) { 
+            bgm.currentTime = 20; // 手动点击播放也修正进度
+            bgm.play(); 
+            musicBtn.classList.add('playing'); 
+        } else { 
+            bgm.pause(); 
+            musicBtn.classList.remove('playing'); 
+        }
+    }
+
+    function initTimer() {
+        const timerEl = document.getElementById('timer');
+        setInterval(() => {
+            const now = new Date();
+            const diff = now - startDate;
+            const d = Math.floor(diff / (1000 * 60 * 60 * 24));
+            const h = Math.floor((diff / (1000 * 60 * 60)) % 24).toString().padStart(2,'0');
+            const m = Math.floor((diff / (1000 * 60)) % 60).toString().padStart(2,'0');
+            const s = Math.floor((diff / 1000) % 60).toString().padStart(2,'0');
+            timerEl.innerText = `${d} Days ${h}:${m}:${s}`;
+        }, 1000);
+    }
+
+    // ================= 星空 =================
+    function initStarAndMeteor() {
+        const canvas = document.getElementById('canvas-bg');
+        const ctx = canvas.getContext('2d');
+        let w, h, stars = [], meteors = [];
+
+        function resize() { w = canvas.width = window.innerWidth; h = canvas.height = window.innerHeight; }
+        window.addEventListener('resize', resize);
+        resize();
+
+        for(let i=0; i<150; i++) stars.push({
+            x: Math.random()*w, y: Math.random()*h, r: Math.random()*1.5, a: Math.random()
+        });
+
+        class Meteor {
+            constructor() { this.reset(); }
+            reset() {
+                this.x = Math.random() * w + 300; 
+                this.y = -100;
+                this.len = Math.random() * 80 + 50;
+                this.speed = Math.random() * 8 + 6;
+                this.active = true;
+            }
+            update() {
+                this.x -= this.speed; this.y += this.speed;
+                if (this.x < -100 || this.y > h + 100) this.active = false;
+            }
+            draw() {
+                if (!this.active) return;
+                ctx.beginPath();
+                let gradient = ctx.createLinearGradient(this.x, this.y, this.x + this.len, this.y - this.len);
+                gradient.addColorStop(0, "rgba(255,255,255,1)");
+                gradient.addColorStop(1, "rgba(255,255,255,0)");
+                ctx.strokeStyle = gradient; ctx.lineWidth = 1.2;
+                ctx.moveTo(this.x, this.y); ctx.lineTo(this.x + this.len, this.y - this.len);
+                ctx.stroke();
+            }
+        }
+
+        function animate() {
+            ctx.clearRect(0,0,w,h);
+            ctx.fillStyle = "#fff";
+            stars.forEach(s => {
+                ctx.globalAlpha = s.a + Math.sin(Date.now()/500 * s.r)*0.3; 
+                ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI*2); ctx.fill();
+            });
+            ctx.globalAlpha = 1;
+            if (Math.random() < 0.02) meteors.push(new Meteor());
+            meteors = meteors.filter(m => m.active);
+            meteors.forEach(m => { m.update(); m.draw(); });
+            requestAnimationFrame(animate);
+        }
+        animate();
+    }
+
+    // ================= 烟花 =================
+    let launchManualFirework;
+    function initFireworks() {
+        const canvas = document.getElementById('canvas-fireworks');
+        const ctx = canvas.getContext('2d');
+        let w, h, fireworks = [], particles = [];
+
+        function resize() { w = canvas.width = window.innerWidth; h = canvas.height = window.innerHeight; }
+        window.addEventListener('resize', resize);
+        resize();
+
+        class Firework {
+            constructor(sx, sy, tx, ty) {
+                this.x = sx; this.y = sy;
+                this.sx = sx; this.sy = sy;
+                this.tx = tx; this.ty = ty;
+                this.distanceToTarget = Math.sqrt(Math.pow(tx - sx, 2) + Math.pow(ty - sy, 2));
+                this.distanceTraveled = 0;
+                this.coordinates = [];
+                this.coordinateCount = 3;
+                while(this.coordinateCount--) { this.coordinates.push([this.x, this.y]); }
+                this.angle = Math.atan2(ty - sy, tx - sx);
+                this.speed = 2;
+                this.acceleration = 1.05;
+                this.brightness = Math.random() * 50 + 50;
+                this.targetRadius = 1;
+            }
+            update(index) {
+                this.coordinates.pop();
+                this.coordinates.unshift([this.x, this.y]);
+                if(this.targetRadius < 8) this.targetRadius += 0.3; else this.targetRadius = 1;
+                this.speed *= this.acceleration;
+                let vx = Math.cos(this.angle) * this.speed;
+                let vy = Math.sin(this.angle) * this.speed;
+                this.distanceTraveled = Math.sqrt(Math.pow(this.sx - this.x, 2) + Math.pow(this.sy - this.y, 2));
+                if(this.distanceTraveled >= this.distanceToTarget) {
+                    createParticles(this.tx, this.ty);
+                    fireworks.splice(index, 1);
+                } else { this.x += vx; this.y += vy; }
+            }
+            draw() {
+                ctx.beginPath();
+                ctx.moveTo(this.coordinates[this.coordinates.length - 1][0], this.coordinates[this.coordinates.length - 1][1]);
+                ctx.lineTo(this.x, this.y);
+                ctx.strokeStyle = 'hsl(' + hue + ', 100%, ' + this.brightness + '%)';
+                ctx.stroke();
+            }
+        }
+
+        class Particle {
+            constructor(x, y) {
+                this.x = x; this.y = y;
+                this.coordinates = [];
+                this.coordinateCount = 5;
+                while(this.coordinateCount--) { this.coordinates.push([this.x, this.y]); }
+                this.angle = Math.random() * Math.PI * 2;
+                this.speed = Math.random() * 10 + 1;
+                this.friction = 0.95;
+                this.gravity = 1;
+                this.hue = Math.random() * 20 + hue;
+                this.brightness = Math.random() * 50 + 50;
+                this.alpha = 1;
+                this.decay = Math.random() * 0.015 + 0.015;
+            }
+            update(index) {
+                this.coordinates.pop();
+                this.coordinates.unshift([this.x, this.y]);
+                this.speed *= this.friction;
+                this.x += Math.cos(this.angle) * this.speed;
+                this.y += Math.sin(this.angle) * this.speed + this.gravity;
+                this.alpha -= this.decay;
+                if(this.alpha <= this.decay) particles.splice(index, 1);
+            }
+            draw() {
+                ctx.beginPath();
+                ctx.moveTo(this.coordinates[this.coordinates.length - 1][0], this.coordinates[this.coordinates.length - 1][1]);
+                ctx.lineTo(this.x, this.y);
+                ctx.strokeStyle = 'hsla(' + this.hue + ', 100%, ' + this.brightness + '%, ' + this.alpha + ')';
+                ctx.stroke();
+            }
+        }
+
+        function createParticles(x, y) {
+            let particleCount = 60; 
+            while(particleCount--) particles.push(new Particle(x, y));
+        }
+
+        let hue = 120;
+        let limiterTotal = 15; 
+        let limiterTick = 0;
+
+        launchManualFirework = function() {
+            fireworks.push(new Firework(w/2, h, Math.random() * w, h/3));
+        }
+
+        function loop() {
+            requestAnimationFrame(loop);
+            hue += 0.5;
+            ctx.globalCompositeOperation = 'destination-out';
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.2)'; 
+            ctx.fillRect(0, 0, w, h);
+            ctx.globalCompositeOperation = 'lighter'; 
+
+            let i = fireworks.length;
+            while(i--) { fireworks[i].draw(); fireworks[i].update(i); }
+            let j = particles.length;
+            while(j--) { particles[j].draw(); particles[j].update(j); }
+
+            if(limiterTick >= limiterTotal) {
+                if(Math.random() < 0.2) { 
+                    fireworks.push(new Firework(w/2, h, Math.random() * w, Math.random() * h / 2));
+                    limiterTick = 0;
+                }
+            } else { limiterTick++; }
+        }
+        loop();
+    }
+</script>
+</body>
+</html>
