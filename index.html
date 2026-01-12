@@ -13,7 +13,7 @@
             background: radial-gradient(circle at center, #0b0d17 0%, #161a30 40%, #000000 100%);
             overflow: hidden;
             display: flex;
-            perspective: 1600px; /* 大景深，防挤压 */
+            perspective: 1600px; 
             transform-style: preserve-3d;
             height: 100vh;
             font-family: 'Lato', sans-serif;
@@ -42,8 +42,6 @@
             position: absolute;
             left: 0; top: 0;
             width: 100%; height: 100%;
-            
-            /* 边框设计 */
             border: 2px solid rgba(255,255,255,0.9);
             border-bottom: 10px solid rgba(255,255,255,0.9); 
             border-radius: 5px;
@@ -52,7 +50,7 @@
             object-fit: cover;
             cursor: pointer;
             
-            /* 关键：设置长过渡时间，让变形过程肉眼可见 */
+            /* 变形过渡时间 */
             transition: transform 2s cubic-bezier(0.2, 0.8, 0.2, 1), 
                         opacity 1s, 
                         border-color 0.5s, 
@@ -87,7 +85,7 @@
             white-space: nowrap;
             pointer-events: none;
             text-shadow: 0 0 20px rgba(243, 229, 171, 0.2);
-            opacity: 0; /* 开始时隐藏文字，圆环出现时再显示 */
+            opacity: 0; 
             transition: opacity 2s;
         }
         
@@ -123,6 +121,7 @@
             color: #f3e5ab;
         }
 
+        /* --- 启动屏 --- */
         #start-screen {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: #000; z-index: 9999;
@@ -131,12 +130,30 @@
         }
         #start-btn {
             margin-top: 40px; padding: 12px 50px;
-            border: 1px solid #f3e5ab; color: #f3e5ab;
+            border: 1px solid #555; /* 初始灰色 */
+            color: #777;
             background: transparent; font-size: 1.1rem;
-            cursor: pointer; letter-spacing: 3px; border-radius: 50px;
+            cursor: not-allowed; /* 初始禁止点击 */
+            letter-spacing: 3px; border-radius: 50px;
             transition: 0.3s;
+            pointer-events: none;
         }
-        #start-btn:hover { background: #f3e5ab; color: #000; box-shadow: 0 0 30px #f3e5ab; }
+        /* 加载完成后的样式 */
+        #start-btn.ready {
+            border-color: #f3e5ab;
+            color: #f3e5ab;
+            cursor: pointer;
+            pointer-events: auto;
+            box-shadow: 0 0 15px rgba(243, 229, 171, 0.3);
+            animation: pulseBtn 2s infinite;
+        }
+        #start-btn.ready:hover { background: #f3e5ab; color: #000; box-shadow: 0 0 30px #f3e5ab; }
+
+        @keyframes pulseBtn {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
 
         #canvas-bg { position: fixed; top: 0; left: 0; z-index: -2; }
         #canvas-fireworks { position: fixed; top: 0; left: 0; z-index: -1; pointer-events: none; }
@@ -146,15 +163,20 @@
 
     <!-- 启动层 -->
     <div id="start-screen">
-        <h1 style="font-family: 'Playfair Display'; font-size: 2.5rem; color: #f3e5ab;">Since 2017.01.13</h1>
-        <p style="color: rgba(255,255,255,0.5); font-size: 0.8rem; margin-top: 10px;">Our Moments</p>
-        <button id="start-btn" onclick="startApp()">Start Love</button>
+        <h1 style="font-family: 'Playfair Display'; font-size: 2.5rem; color: #f3e5ab;">Since 2017</h1>
+        <p style="color: rgba(255,255,255,0.5); font-size: 0.8rem; margin-top: 10px;">Our 23 Moments</p>
+        
+        <!-- 按钮初始显示 Loading -->
+        <button id="start-btn" onclick="startApp()">Loading... 0%</button>
     </div>
 
     <!-- UI -->
     <div id="ui-layer">
         <div class="timer-box">
             <div class="timer-count" id="timer">Loading...</div>
+        </div>
+        <div style="text-align: center; color: rgba(255,255,255,0.2); font-size: 12px;">
+            Tap Photo to Focus & Spark
         </div>
     </div>
 
@@ -179,129 +201,131 @@
         friction: 0.95          
     };
 
-    // ================= 逻辑 =================
+    // ================= 全局变量 =================
     const spinContainer = document.getElementById('spin-container');
     const dragContainer = document.getElementById('drag-container');
+    const startBtn = document.getElementById('start-btn');
     let images = [];
     
-    let tX = 0, tY = 0; // 初始角度归零
+    let tX = 0, tY = 0; 
     let desX = 0, desY = 0; 
     let isDragging = false;
-    let autoPlay = false; // 初始不旋转，因为要展示心形
+    let autoPlay = false; 
     let selectedIndex = -1; 
-    let radius = 0; // 半径动态计算
+    let radius = 0; 
 
-    // --- 启动逻辑 ---
-    function startApp() {
-        const startScreen = document.getElementById('start-screen');
-        startScreen.style.opacity = 0;
-        setTimeout(() => { startScreen.style.visibility = 'hidden'; }, 1000);
-        
+    // ================= 1. 预加载流程 (页面打开即执行) =================
+    window.onload = function() {
         // 计算半径
-        if(window.innerWidth < 900) { 
-            radius = 360; 
-        } else { 
-            radius = 500; 
-        }
-
-        // 1. 初始化特效
-        initTimer();
+        if(window.innerWidth < 900) { radius = 360; } else { radius = 500; }
+        
+        initTimer(); // 启动计时器
+        preloadResources(); // 开始加载图片
+        
+        // 提前启动背景特效，让等待不枯燥
         initStarAndMeteor(); 
         initFireworks();     
-        
-        // 2. 生成图片并以心形展示
-        generateImages();
-        
-        // 3. 3.5秒后，变形成圆环并开始旋转
-        setTimeout(() => {
-            transformToRing();
-        }, 3500);
-        
-        renderLoop();
-    }
+        renderLoop(); // 启动渲染循环
+    };
 
-    // 生成图片
-    function generateImages() {
+    function preloadResources() {
+        let loadedCount = 0;
+        
         for (let i = 0; i < config.totalImages; i++) {
             let img = document.createElement('img');
+            // 设置初始透明度为0，并添加到DOM中（在黑屏后面）
+            // 这样浏览器就会强制下载并渲染它们
             img.src = `${i + 1}${config.imgExtension}`; 
-            img.onerror = function() { this.src = `https://picsum.photos/id/${i + 50}/200/300`; };
-            img.dataset.idx = i;
             
-            img.onclick = function(e) {
-                e.stopPropagation();
-                focusOnImage(i, this);
+            // 成功回调
+            img.onload = () => {
+                loadedCount++;
+                updateProgress(loadedCount);
             };
+            
+            // 失败回调
+            img.onerror = () => {
+                console.warn(`Image ${i+1} failed, loading fallback.`);
+                img.src = `https://picsum.photos/id/${i + 50}/200/300`;
+                // 即使失败，重试后也算加载完成，避免卡住
+                img.onload = () => { loadedCount++; updateProgress(loadedCount); };
+            };
+
+            img.dataset.idx = i;
+            img.onclick = function(e) { e.stopPropagation(); focusOnImage(i, this); };
 
             spinContainer.appendChild(img);
             images.push(img);
         }
-
-        // 延迟一小会儿，让DOM上树后再执行位置变换
-        setTimeout(() => {
-            arrangeInHeart();
-            // 让图片显现
-            images.forEach(img => img.classList.add('loaded'));
-        }, 100);
     }
 
-    // ★★★ 核心形态 1：组成心形 ★★★
+    function updateProgress(count) {
+        const percent = Math.floor((count / config.totalImages) * 100);
+        startBtn.innerText = `Loading... ${percent}%`;
+
+        if (count >= config.totalImages) {
+            // 全部加载完成
+            startBtn.innerText = "Start Love";
+            startBtn.classList.add('ready');
+            
+            // 此时图片已经在DOM里了，我们在后台把它们排成心形
+            // 用户还看不见，因为有黑屏挡着
+            arrangeInHeart();
+            
+            // 让图片显现 (opacity 0 -> 1)
+            // 此时它们还在黑屏后面，所以用户看不见这个突兀的过程
+            setTimeout(() => {
+                images.forEach(img => img.classList.add('loaded'));
+            }, 100);
+        }
+    }
+
+    // ================= 2. 启动逻辑 (点击按钮后) =================
+    function startApp() {
+        const startScreen = document.getElementById('start-screen');
+        // 淡出黑屏
+        startScreen.style.opacity = 0;
+        setTimeout(() => { startScreen.style.visibility = 'hidden'; }, 1000);
+        
+        // 此时，用户会看到已经排好队的心形照片！
+        
+        // 3.5秒后，变形成圆环
+        setTimeout(() => {
+            transformToRing();
+        }, 3500);
+    }
+
+    // --- 形态 1：心形 ---
     function arrangeInHeart() {
         const len = images.length;
-        
-        // 针对手机横屏的缩放比例
         let scale = (window.innerWidth < 900) ? 10 : 16; 
         
         for(let i = 0; i < len; i++) {
-            // 心形参数方程
-            // t 范围从 0 到 2PI
-            // 我们让照片均匀分布在心形线上
-            // i=0 在上方凹陷处，i=len/2 在心尖
             let t = (i / len) * Math.PI * 2;
-            
             let x = 16 * Math.pow(Math.sin(t), 3);
             let y = -(13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t));
-            
-            // 放大坐标
             x = x * scale;
             y = y * scale;
-
-            // 应用变换 (平铺在屏幕上，rotateY=0)
-            // 稍微加一点 translateZ 让它们不重叠，或者完全平面
             images[i].style.transform = `translate3d(${x}px, ${y}px, 0px)`;
-            images[i].style.zIndex = 100; // 保证在最前
+            images[i].style.zIndex = 100; 
         }
     }
 
-    // ★★★ 核心形态 2：变形成圆环 ★★★
+    // --- 形态 2：圆环 ---
     function transformToRing() {
-        // 让图片飞向圆环位置
         for (let i = 0; i < images.length; i++) {
             const angle = i * (360 / config.totalImages);
-            // 重置 transform，应用圆环逻辑
             images[i].style.transform = `rotateY(${angle}deg) translateZ(${radius}px)`;
             images[i].style.zIndex = '';
         }
-
-        // 显示中心文字
         document.getElementById('center-text').classList.add('show');
-        
-        // 设置初始俯仰角
         tY = 5; 
-        
-        // 开启自动旋转
-        setTimeout(() => {
-            autoPlay = true;
-        }, 2000); // 等变形动画（CSS 2s）完成后再开始转
+        setTimeout(() => { autoPlay = true; }, 2000); 
     }
-
 
     // --- 聚焦交互 ---
     function focusOnImage(index, imgEl) {
-        if (!autoPlay && selectedIndex === -1 && index !== -1) {
-            // 如果还在心形阶段，不允许点击，或者直接跳转
-            return; 
-        }
+        if (!autoPlay && selectedIndex === -1 && index !== -1) return; 
 
         if (selectedIndex === index) {
             cancelFocus();
@@ -349,8 +373,6 @@
             tX += desX;
             tY += desY;
         } 
-        
-        // 限制角度
         if (tY > 15) tY = 15;
         if (tY < -15) tY = -15;
 
@@ -374,41 +396,25 @@
     });
     document.addEventListener('pointerup', () => { isDragging = false; });
 
-function initTimer() {
+    // 计时器 (精确到年)
+    function initTimer() {
         const timerEl = document.getElementById('timer');
-
         const update = () => {
             const now = new Date();
-            
-            // 1. 先计算年份差
             let years = now.getFullYear() - startDate.getFullYear();
-
-            // 2. 检查今年的纪念日是否已经过了
-            // 如果当前月份小于开始月份，或者月份相同但日期还没到，说明不满一年，年份减1
             if (now.getMonth() < startDate.getMonth() || 
                (now.getMonth() === startDate.getMonth() && now.getDate() < startDate.getDate())) {
                 years--;
             }
-
-            // 3. 计算“上一个纪念日”是哪一天
-            // 例如：如果是2026年1月12日，上一个纪念日就是2025年1月13日
             const lastAnniversary = new Date(startDate);
             lastAnniversary.setFullYear(startDate.getFullYear() + years);
-
-            // 4. 计算剩余的时间差 (现在 - 上一个纪念日)
             const diff = now - lastAnniversary;
-
-            // 5. 换算单位
             const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-            const hours = Math.floor((diff / (1000 * 60 * 60)) % 24).toString().padStart(2, '0');
-            const minutes = Math.floor((diff / (1000 * 60)) % 60).toString().padStart(2, '0');
-            const seconds = Math.floor((diff / 1000) % 60).toString().padStart(2, '0');
-
-            // 6. 显示结果 (格式：9 Years 0 Days 00:00:00)
-            timerEl.innerText = `${years} Years ${days} Days ${hours}:${minutes}:${seconds}`;
+            const h = Math.floor((diff / (1000 * 60 * 60)) % 24).toString().padStart(2, '0');
+            const m = Math.floor((diff / (1000 * 60)) % 60).toString().padStart(2, '0');
+            const s = Math.floor((diff / 1000) % 60).toString().padStart(2, '0');
+            timerEl.innerText = `${years} Years ${days} Days ${h}:${m}:${s}`;
         };
-
-        // 立即执行一次，避免1秒延迟
         update();
         setInterval(update, 1000);
     }
